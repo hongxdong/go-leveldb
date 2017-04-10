@@ -1,2 +1,3 @@
 # go-leveldb
-Another implementation of key/value storage library leveldb Written in golang.
+Another implementation of [the key/value storage library leveldb](https://github.com/google/leveldb) Written in golang.
+Still working on this project.
