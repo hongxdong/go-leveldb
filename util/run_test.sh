@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "test cache"
-go test cache_test.go cache.go slice.go hash.go
+go test cache_test.go cache.go slice.go hash.go assert.go
 
 echo "test crc32c"
 go test crc32c_test.go crc32c.go

@@ -19,6 +19,7 @@ package util
 
 import (
   "sync"
+  //"fmt"
 )
 
 // Create a new cache with a fixed size capacity.  This implementation
@@ -40,7 +41,7 @@ type Cache interface {
   //
   // When the inserted entry is no longer needed, the key and
   // value will be passed to "deleter".
-  Insert(key *Slice, value *Slice, charge uint64, deleter LRUHandleDeleter) CacheHandle
+  Insert(key *Slice, value interface{}, charge uint64, deleter LRUHandleDeleter) CacheHandle
 
   // If the cache has no mapping for "key", returns NULL.
   //
@@ -58,7 +59,7 @@ type Cache interface {
   // successful Lookup().
   // REQUIRES: handle must not have been released yet.
   // REQUIRES: handle must have been returned by a method on *this.
-  Value(handle CacheHandle) *Slice
+  Value(handle CacheHandle) interface{}
 
   // If the cache contains entry for key, erase it.  Note that the
   // underlying entry will be kept around until all existing handles
@@ -112,7 +113,7 @@ type Cache interface {
 type LRUHandleDeleter func(*Slice, interface{})
 
 type LRUHandle struct {
-  value      *Slice
+  value      interface{}
   deleter    LRUHandleDeleter
   next_hash  *LRUHandle
   next       *LRUHandle
@@ -130,7 +131,7 @@ func (lh *LRUHandle) key() *Slice {
   // For cheaper lookups, we allow a temporary Handle object
   // to store a pointer to a key in "value".
   if (lh.next == lh) {
-    return lh.value
+    return lh.value.(*Slice)
   } else {
     return NewSlice(lh.key_data)
   }
@@ -297,7 +298,7 @@ func (s *LRUCache) Unref(e *LRUHandle) {
     if e.in_cache {
       panic("Unref() error")
     }
-    // (*e->deleter)(e->key(), e->value);
+    e.deleter(e.key(), e.value)
     // free(e);
   } else if e.in_cache && e.refs == 1 {   // No longer in use; move to lru_ list.
     s.LRU_Remove(e)
@@ -334,7 +335,7 @@ func (s *LRUCache) Release(handle CacheHandle) {
   s.mutex_.Unlock()
 }
 
-func (s *LRUCache) Insert(key *Slice, hash uint32, value *Slice,
+func (s *LRUCache) Insert(key *Slice, hash uint32, value interface{},
                           charge uint64, deleter LRUHandleDeleter) CacheHandle {
   s.mutex_.Lock()
 
@@ -367,6 +368,7 @@ func (s *LRUCache) Insert(key *Slice, hash uint32, value *Slice,
     }
   }
 
+  s.mutex_.Unlock()
   return e
 }
 
@@ -442,7 +444,7 @@ func ConstructShardedLRUCache(capacity uint64) *ShardedLRUCache {
   return slru
 }
 
-func (t *ShardedLRUCache) Insert(key *Slice, value *Slice, charge uint64, deleter LRUHandleDeleter) CacheHandle {
+func (t *ShardedLRUCache) Insert(key *Slice, value interface{}, charge uint64, deleter LRUHandleDeleter) CacheHandle {
   var hash uint32 = t.HashSlice(key)
   return t.shard_[t.Shard(hash)].Insert(key, hash, value, charge, deleter)
 }
@@ -462,7 +464,7 @@ func (t *ShardedLRUCache) Erase(key *Slice) {
   t.shard_[t.Shard(hash)].Erase(key, hash)
 }
 
-func (t *ShardedLRUCache) Value(handle CacheHandle) *Slice {
+func (t *ShardedLRUCache) Value(handle CacheHandle) interface{} {
   var h *LRUHandle = (handle).(*LRUHandle)
   return h.value
 }
