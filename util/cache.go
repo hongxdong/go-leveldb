@@ -299,8 +299,10 @@ func (s *LRUCache) Unref(e *LRUHandle) {
       panic("Unref() error")
     }
     e.deleter(e.key(), e.value)
+    // fmt.Printf("deleter(%v, %T)\n", e, e)
     // free(e);
   } else if e.in_cache && e.refs == 1 {   // No longer in use; move to lru_ list.
+    // fmt.Printf("lru_(%v, %T)\n", e, e)
     s.LRU_Remove(e)
     s.LRU_Append(&s.lru_, e)
   }

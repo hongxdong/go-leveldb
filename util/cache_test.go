@@ -37,9 +37,12 @@ type CacheTest struct {
   cache_   Cache
 }
 
+var current_deleted_keys   []int
+var current_deleted_values []int
+
 func Deleter(key *Slice, v interface{}) {
-  current_.deleted_keys_   = append(current_.deleted_keys_, DecodeKey(key))
-  current_.deleted_values_ = append(current_.deleted_values_, DecodeValue(v))
+  current_deleted_keys   = append(current_deleted_keys, DecodeKey(key))
+  current_deleted_values = append(current_deleted_values, DecodeValue(v))
 }
 
 func ConstructCacheTest() *CacheTest {
@@ -67,8 +70,14 @@ func (s *CacheTest) Insert(key int, value int, charge uint64) {
   s.cache_.Release(s.cache_.Insert(NewSlice(EncodeKey(key)), value, charge, Deleter))
 }
 
+func (s *CacheTest) Erase(key int) {
+  s.cache_.Erase(NewSlice(EncodeKey(key)))
+}
+
 func TestCache_HitAndMiss(t *testing.T) {
-  fmt.Println("Run TestCache")
+  fmt.Println("Run TestCache_HitAndMiss()")
+  current_deleted_keys   = current_deleted_keys[:0]
+  current_deleted_values = current_deleted_values[:0]
 
   ASSERT_EQ(-1, current_.Lookup(100))
 
@@ -87,10 +96,42 @@ func TestCache_HitAndMiss(t *testing.T) {
   ASSERT_EQ(201, current_.Lookup(200))
   ASSERT_EQ(-1, current_.Lookup(300))
 
-  ASSERT_EQ(1, len(current_.deleted_keys_))
-  ASSERT_EQ(100, current_.deleted_keys_[0])
-  ASSERT_EQ(101, current_.deleted_values_[0])
+  ASSERT_EQ(1, len(current_deleted_keys))
+  ASSERT_EQ(100, current_deleted_keys[0])
+  ASSERT_EQ(101, current_deleted_values[0])
   // fmt.Printf("(%v, %T)\n", current_.deleted_values_, current_.deleted_values_)
 }
+
+var current_2 *CacheTest = ConstructCacheTest()
+
+func TestCache_Erase(t *testing.T) {
+  current_deleted_keys   = current_deleted_keys[:0]
+  current_deleted_values = current_deleted_values[:0]
+
+  current_2.Erase(200)
+  ASSERT_EQ(0, len(current_2.deleted_keys_))
+
+  current_2.Insert(100, 101, 1)
+  current_2.Insert(200, 201, 1)
+  current_2.Erase(100)
+  // fmt.Printf("(%v, %T)\n", current_deleted_keys, current_deleted_keys)
+  ASSERT_EQ(-1,  current_2.Lookup(100))
+  ASSERT_EQ(201, current_2.Lookup(200))
+  ASSERT_EQ(1,   len(current_deleted_keys))
+  ASSERT_EQ(100, current_deleted_keys[0])
+  ASSERT_EQ(101, current_deleted_values[0])
+
+  current_2.Erase(100)
+  ASSERT_EQ(-1,  current_2.Lookup(100))
+  ASSERT_EQ(201, current_2.Lookup(200))
+  ASSERT_EQ(1,   len(current_deleted_keys))
+}
+
+
+
+
+
+
+
 
 
