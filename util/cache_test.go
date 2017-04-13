@@ -29,7 +29,6 @@ func DecodeValue(v interface{}) int {
 
 const kCacheSize = 1000
 
-var current_ *CacheTest = ConstructCacheTest()
 
 type CacheTest struct {
   deleted_keys_   []int
@@ -76,6 +75,7 @@ func (s *CacheTest) Erase(key int) {
 
 func TestCache_HitAndMiss(t *testing.T) {
   fmt.Println("Run TestCache_HitAndMiss()")
+  var current_ *CacheTest = ConstructCacheTest()
   current_deleted_keys   = current_deleted_keys[:0]
   current_deleted_values = current_deleted_values[:0]
 
@@ -102,9 +102,9 @@ func TestCache_HitAndMiss(t *testing.T) {
   // fmt.Printf("(%v, %T)\n", current_.deleted_values_, current_.deleted_values_)
 }
 
-var current_2 *CacheTest = ConstructCacheTest()
 
 func TestCache_Erase(t *testing.T) {
+  var current_2 *CacheTest = ConstructCacheTest()
   current_deleted_keys   = current_deleted_keys[:0]
   current_deleted_values = current_deleted_values[:0]
 
@@ -128,8 +128,57 @@ func TestCache_Erase(t *testing.T) {
 }
 
 
+func TestCache_EntriesArePinned(t *testing.T) {
+  var current_3 *CacheTest = ConstructCacheTest()
+  current_deleted_keys   = current_deleted_keys[:0]
+  current_deleted_values = current_deleted_values[:0]
 
+  current_3.Insert(100, 101, 1)
+  var h1 CacheHandle = current_3.cache_.Lookup(NewSlice(EncodeKey(100)))
+  ASSERT_EQ(101, DecodeValue(current_3.cache_.Value(h1)))
 
+  current_3.Insert(100, 102, 1)
+  var h2 CacheHandle = current_3.cache_.Lookup(NewSlice(EncodeKey(100)))
+  ASSERT_EQ(102, DecodeValue(current_3.cache_.Value(h2)))
+  ASSERT_EQ(0, len(current_deleted_keys))
+
+  current_3.cache_.Release(h1)
+  ASSERT_EQ(1, len(current_deleted_keys))
+  ASSERT_EQ(100, current_deleted_keys[0])
+  ASSERT_EQ(101, current_deleted_values[0])
+
+  current_3.Erase(100)
+  ASSERT_EQ(-1, current_3.Lookup(100))
+  ASSERT_EQ(1,  len(current_deleted_keys))
+
+  current_3.cache_.Release(h2)
+  ASSERT_EQ(2, len(current_deleted_keys))
+  ASSERT_EQ(100, current_deleted_keys[1])
+  ASSERT_EQ(102, current_deleted_values[1])
+}
+
+func TestCache_EvictionPolicy(t *testing.T) {
+  var current_4 *CacheTest = ConstructCacheTest()
+  current_deleted_keys = current_deleted_keys[:0]
+  current_deleted_values = current_deleted_values[:0]
+
+  current_4.Insert(100, 101, 1)
+  current_4.Insert(200, 201, 1)
+  current_4.Insert(300, 301, 1)
+  var h CacheHandle = current_4.cache_.Lookup(NewSlice(EncodeKey(300)))
+
+  // Frequently used entry must be kept around,
+  // as must things that are still in use.
+  for i := 0; i < kCacheSize + 100; i++ {
+    current_4.Insert(1000+i, 2000+i, 1)
+    ASSERT_EQ(2000+i, current_4.Lookup(1000+i))
+    ASSERT_EQ(101, current_4.Lookup(100))
+  }
+  ASSERT_EQ(101, current_4.Lookup(100))
+  ASSERT_EQ(-1,  current_4.Lookup(200))
+  ASSERT_EQ(301, current_4.Lookup(300))
+  current_4.cache_.Release(h)
+}
 
 
 
