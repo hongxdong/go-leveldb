@@ -69,6 +69,10 @@ func (s *CacheTest) Insert(key int, value int, charge uint64) {
   s.cache_.Release(s.cache_.Insert(NewSlice(EncodeKey(key)), value, charge, Deleter))
 }
 
+func (s *CacheTest) InsertAndReturnHandle(key int, value int, charge uint64) CacheHandle {
+  return s.cache_.Insert(NewSlice(EncodeKey(key)), value, charge, Deleter)
+}
+
 func (s *CacheTest) Erase(key int) {
   s.cache_.Erase(NewSlice(EncodeKey(key)))
 }
@@ -180,7 +184,26 @@ func TestCache_EvictionPolicy(t *testing.T) {
   current_4.cache_.Release(h)
 }
 
+func TestCache_UseExceedsCacheSize(t *testing.T) {
+  var current_5 *CacheTest = ConstructCacheTest()
+  current_deleted_keys = current_deleted_keys[:0]
+  current_deleted_values = current_deleted_values[:0]
 
+  // Overfill the cache, keeping handles on all inserted entries.
+  var h []CacheHandle
+  for i := 0; i < kCacheSize + 100; i++ {
+    h = append(h, current_5.InsertAndReturnHandle(1000+i, 2000+i, 1))
+  }
+
+  // Check that all the entries can be found in the cache.
+  for i := 0; i < len(h); i++ {
+    ASSERT_EQ(2000+i, current_5.Lookup(1000+i))
+  }
+
+  for i := 0; i < len(h); i++ {
+    current_5.cache_.Release(h[i])
+  }
+}
 
 
 
