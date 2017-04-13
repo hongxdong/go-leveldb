@@ -205,5 +205,73 @@ func TestCache_UseExceedsCacheSize(t *testing.T) {
   }
 }
 
+func TestCache_HeavyEntries(t *testing.T) {
+  // Add a bunch of light and heavy entries and then count the combined
+  // size of items still in the cache, which must be approximately the
+  // same as the total capacity.
 
+  var current_6 *CacheTest = ConstructCacheTest()
+  current_deleted_keys = current_deleted_keys[:0]
+  current_deleted_values = current_deleted_values[:0]
 
+  const kLight  = int(1)
+  const kHeavy  = int(10)
+  var added int = 0
+  var index int = 0
+  for added < 2*kCacheSize {
+    var weight int
+    if index & 1 == 1 {
+      weight = kLight
+    } else {
+      weight = kHeavy
+    }
+    current_6.Insert(index, 1000+index, uint64(weight))
+    added += weight
+    index++
+  }
+
+  var cached_weight int = 0
+  for i := 0; i < index; i++ {
+    var weight int
+    if i & 1 == 1 {
+      weight = kLight
+    } else {
+      weight = kHeavy
+    }
+    var r int = current_6.Lookup(i)
+    if r >= 0 {
+      cached_weight += weight
+      ASSERT_EQ(1000+i, r)
+    }
+  }
+  ASSERT_LE(cached_weight, kCacheSize + kCacheSize/10)
+}
+
+func TestCache_NewId(t *testing.T) {
+  var current_7 *CacheTest = ConstructCacheTest()
+  current_deleted_keys = current_deleted_keys[:0]
+  current_deleted_values = current_deleted_values[:0]
+
+  var a uint64 = current_7.cache_.NewId()
+  var b uint64 = current_7.cache_.NewId()
+  ASSERT_NE(a, b)
+}
+
+func TestCache_Prune(t *testing.T) {
+  var current_8 *CacheTest = ConstructCacheTest()
+  current_deleted_keys = current_deleted_keys[:0]
+  current_deleted_values = current_deleted_values[:0]
+
+  current_8.Insert(1, 100, 1)
+  current_8.Insert(2, 200, 1)
+
+  var handle CacheHandle = current_8.cache_.Lookup(NewSlice(EncodeKey(1)))
+  if handle.(*LRUHandle) == nil {
+    panic("TestCache_Prune() error.")
+  }
+  current_8.cache_.Prune()
+  current_8.cache_.Release(handle)
+
+  ASSERT_EQ(100, current_8.Lookup(1))
+  ASSERT_EQ(-1,  current_8.Lookup(2))
+}
